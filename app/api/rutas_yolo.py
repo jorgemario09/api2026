@@ -1,9 +1,9 @@
 import os
-from fastapi import APIRouter, File, UploadFile, HTTPException
 import numpy as np
 import cv2
+from fastapi import APIRouter, File, UploadFile, HTTPException
 
-# Importaciones protegidas para evitar que falle el servidor en el despliegue
+# Importación segura de PyTorch y Ultralytics
 try:
     import torch
     import ultralytics
@@ -23,8 +23,8 @@ model = None
 
 def get_yolo_model():
     global model
-    if ultralytics is None or torch is None:
-        print("Advertencia: PyTorch o Ultralytics no están disponibles en el entorno.")
+    if torch is None or ultralytics is None:
+        print("Advertencia: PyTorch o Ultralytics no están instalados en este entorno.")
         return None
         
     if model is None:
@@ -35,7 +35,7 @@ def get_yolo_model():
                 print(f"Error al cargar el modelo YOLO: {e}")
                 return None
         else:
-            print(f"No se encontró el archivo del modelo en: {MODEL_PATH}")
+            print(f"No se encontró el archivo de pesos en: {MODEL_PATH}")
             return None
     return model
 
