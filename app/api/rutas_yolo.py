@@ -1,4 +1,5 @@
 import os
+import torch
 from fastapi import APIRouter, File, UploadFile, HTTPException
 import ultralytics
 import cv2
@@ -9,25 +10,22 @@ router = APIRouter(
     tags=["Visión Artificial (YOLO)"]
 )
 
-# Buscar el archivo .pt dentro de tu proyecto (app/weights/best.pt)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODEL_PATH = os.path.join(BASE_DIR, "app", "weights", "best.pt")
 
 model = None
-try:
-    if os.path.exists(MODEL_PATH):
+if os.path.exists(MODEL_PATH):
+    try:
         model = ultralytics.YOLO(MODEL_PATH)
-    else:
-        print(f"Advertencia: No se encontró el modelo YOLO en {MODEL_PATH}")
-except Exception as e:
-    print(f"Error al cargar el modelo YOLO: {e}")
+    except Exception as e:
+        print(f"Error al cargar el modelo YOLO: {e}")
 
 @router.post("/inferencia-yolo")
 async def ejecutar_inferencia(file: UploadFile = File(...)):
     if model is None:
         raise HTTPException(
             status_code=500, 
-            detail="El modelo YOLO no está cargado en el servidor. Verifica que 'best.pt' esté subido en 'app/weights/'."
+            detail="El modelo YOLO no está cargado. Revisa que best.pt exista en app/weights/."
         )
     
     contents = await file.read()
@@ -37,7 +35,12 @@ async def ejecutar_inferencia(file: UploadFile = File(...)):
     if img is None:
         raise HTTPException(status_code=400, detail="El archivo enviado no es una imagen válida.")
 
-    results = model(img)
+    # Reducir resolución para ahorrar RAM durante la inferencia
+    img_resized = cv2.resize(img, (320, 320))
+
+    # Ejecutar inferencia optimizada sin guardar gradientes en memoria
+    with torch.no_grad():
+        results = model(img_resized, imgsz=320)
     
     detecciones = []
     for r in results:
