@@ -9,7 +9,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-API_URL = "http://localhost:8000/agua/whatsapp"
+API_URL = "https://api2026-p98y.onrender.com/agua/whatsapp"
 
 def iniciar_bot():
     print("Iniciando Google Chrome...")
