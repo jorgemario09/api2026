@@ -1,8 +1,8 @@
 import os
+import gc
 from fastapi import APIRouter, File, UploadFile, HTTPException
 import numpy as np
 
-# Importaciones protegidas para evitar caídas en Render
 try:
     import cv2
 except ModuleNotFoundError:
@@ -11,6 +11,8 @@ except ModuleNotFoundError:
 try:
     import torch
     import ultralytics
+    # Desactivar autograd para reducir consumo de memoria global
+    torch.set_grad_enabled(False)
 except ModuleNotFoundError:
     torch = None
     ultralytics = None
@@ -28,35 +30,30 @@ model = None
 def get_yolo_model():
     global model
     if ultralytics is None or torch is None:
-        print("Advertencia: PyTorch u Ultralytics no están disponibles en el entorno.")
-        return None
+        return None, "Librerías PyTorch/Ultralytics no disponibles."
         
     if model is None:
         if os.path.exists(MODEL_PATH):
             try:
+                # Cargar modelo directamente en CPU
                 model = ultralytics.YOLO(MODEL_PATH)
+                if hasattr(model, 'eval'):
+                    model.eval()
             except Exception as e:
-                print(f"Error al cargar el modelo YOLO: {e}")
-                return None
+                return None, f"Error cargando best.pt: {str(e)}"
         else:
-            print(f"No se encontró el archivo del modelo en: {MODEL_PATH}")
-            return None
-    return model
+            return None, f"No se encontró el archivo en {MODEL_PATH}"
+            
+    return model, "OK"
 
 @router.post("/inferencia-yolo")
 async def ejecutar_inferencia(file: UploadFile = File(...)):
     if cv2 is None:
-        raise HTTPException(
-            status_code=500, 
-            detail="La librería OpenCV (cv2) no está disponible en el servidor."
-        )
+        raise HTTPException(status_code=500, detail="OpenCV no instalado.")
 
-    yolo_model = get_yolo_model()
+    yolo_model, msg_error = get_yolo_model()
     if yolo_model is None:
-        raise HTTPException(
-            status_code=500, 
-            detail="El modelo YOLO o PyTorch no está disponible en el servidor de Render."
-        )
+        raise HTTPException(status_code=500, detail=f"Modelo no disponible: {msg_error}")
     
     contents = await file.read()
     nparr = np.frombuffer(contents, np.uint8)
@@ -65,27 +62,38 @@ async def ejecutar_inferencia(file: UploadFile = File(...)):
     if img is None:
         raise HTTPException(status_code=400, detail="Imagen no válida.")
 
-    img_resized = cv2.resize(img, (320, 320))
+    # Redimensionar la imagen a un tamaño pequeño (256x256 o 320x320)
+    # Esto evita picos de uso de RAM en la matriz de la imagen
+    img_resized = cv2.resize(img, (256, 256))
 
-    with torch.no_grad():
-        results = yolo_model(img_resized, imgsz=320)
-    
-    detecciones = []
-    for r in results:
-        for box in r.boxes:
-            cls_id = int(box.cls[0])
-            conf = float(box.conf[0])
-            xyxy = box.xyxy[0].tolist()
-            clase_nombre = yolo_model.names[cls_id]
-            
-            detecciones.append({
-                "clase": clase_nombre,
-                "confianza": round(conf * 100, 2),
-                "bounding_box": [round(coord, 2) for coord in xyxy]
-            })
-            
-    return {
-        "estado": "EXITOSO",
-        "total_detectados": len(detecciones),
-        "detecciones": detecciones
-    }
+    try:
+        # Inferencia rápida sin rastreo de gradientes
+        with torch.no_grad():
+            results = yolo_model(img_resized, imgsz=256, verbose=False)
+        
+        detecciones = []
+        for r in results:
+            for box in r.boxes:
+                cls_id = int(box.cls[0])
+                conf = float(box.conf[0])
+                xyxy = box.xyxy[0].tolist()
+                clase_nombre = yolo_model.names[cls_id]
+                
+                detecciones.append({
+                    "clase": clase_nombre,
+                    "confianza": round(conf * 100, 2),
+                    "bounding_box": [round(coord, 2) for coord in xyxy]
+                })
+        
+        # Limpieza forzada de basura en memoria tras la inferencia
+        del img, img_resized, results
+        gc.collect()
+
+        return {
+            "estado": "EXITOSO",
+            "total_detectados": len(detecciones),
+            "detecciones": detecciones
+        }
+    except Exception as e:
+        gc.collect()
+        raise HTTPException(status_code=500, detail=f"Error durante inferencia: {str(e)}")
