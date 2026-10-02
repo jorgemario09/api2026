@@ -10,7 +10,7 @@ router = APIRouter(
 
 # Cargar el modelo entrenado (Ajusta la ruta si es necesario)
 # Usamos raw string (r"") para evitar problemas con las barras invertidas en Windows
-MODEL_PATH = r"C:\YOLO\runs\detect\train-2\weights\best.pt"
+MODEL_PATH = r"C:\YOLO\runs\detect\train-6\weights\best.pt"
 
 try:
     model = ultralytics.YOLO(MODEL_PATH)
