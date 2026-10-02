@@ -1,21 +1,13 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch
-torchvision
 fastapi
 uvicorn
 sqlalchemy
 psycopg2-binary
-requests
-python-dotenv
 python-multipart
 ultralytics
 opencv-python-headless
-influxdb-client-3
-influxdb-client
-pandas
 numpy
 cloudinary
-gradio
-reportlab
-selenium
-webdriver-manager
+requests
+python-dotenv
