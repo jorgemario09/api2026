@@ -1,9 +1,13 @@
 import os
-import numpy as np
-import cv2
 from fastapi import APIRouter, File, UploadFile, HTTPException
+import numpy as np
 
-# Importación segura de PyTorch y Ultralytics
+# Importaciones protegidas para evitar caídas en Render
+try:
+    import cv2
+except ModuleNotFoundError:
+    cv2 = None
+
 try:
     import torch
     import ultralytics
@@ -23,8 +27,8 @@ model = None
 
 def get_yolo_model():
     global model
-    if torch is None or ultralytics is None:
-        print("Advertencia: PyTorch o Ultralytics no están instalados en este entorno.")
+    if ultralytics is None or torch is None:
+        print("Advertencia: PyTorch u Ultralytics no están disponibles en el entorno.")
         return None
         
     if model is None:
@@ -35,12 +39,18 @@ def get_yolo_model():
                 print(f"Error al cargar el modelo YOLO: {e}")
                 return None
         else:
-            print(f"No se encontró el archivo de pesos en: {MODEL_PATH}")
+            print(f"No se encontró el archivo del modelo en: {MODEL_PATH}")
             return None
     return model
 
 @router.post("/inferencia-yolo")
 async def ejecutar_inferencia(file: UploadFile = File(...)):
+    if cv2 is None:
+        raise HTTPException(
+            status_code=500, 
+            detail="La librería OpenCV (cv2) no está disponible en el servidor."
+        )
+
     yolo_model = get_yolo_model()
     if yolo_model is None:
         raise HTTPException(
