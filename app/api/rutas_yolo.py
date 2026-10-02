@@ -1,9 +1,15 @@
 import os
-import torch
 from fastapi import APIRouter, File, UploadFile, HTTPException
-import ultralytics
-import cv2
 import numpy as np
+import cv2
+
+# Importaciones protegidas para evitar que falle el servidor en el despliegue
+try:
+    import torch
+    import ultralytics
+except ModuleNotFoundError:
+    torch = None
+    ultralytics = None
 
 router = APIRouter(
     prefix="/agua",
@@ -13,11 +19,14 @@ router = APIRouter(
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODEL_PATH = os.path.join(BASE_DIR, "app", "weights", "best.pt")
 
-# Variable global para guardar el modelo una vez cargado
 model = None
 
 def get_yolo_model():
     global model
+    if ultralytics is None or torch is None:
+        print("Advertencia: PyTorch o Ultralytics no están disponibles en el entorno.")
+        return None
+        
     if model is None:
         if os.path.exists(MODEL_PATH):
             try:
@@ -26,7 +35,7 @@ def get_yolo_model():
                 print(f"Error al cargar el modelo YOLO: {e}")
                 return None
         else:
-            print(f"No se encontró el archivo en: {MODEL_PATH}")
+            print(f"No se encontró el archivo del modelo en: {MODEL_PATH}")
             return None
     return model
 
@@ -36,7 +45,7 @@ async def ejecutar_inferencia(file: UploadFile = File(...)):
     if yolo_model is None:
         raise HTTPException(
             status_code=500, 
-            detail="El modelo YOLO no está disponible en el servidor."
+            detail="El modelo YOLO o PyTorch no está disponible en el servidor de Render."
         )
     
     contents = await file.read()
