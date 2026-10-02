@@ -14,7 +14,7 @@ python-multipart
 gradio
 ultralytics
 opencv-python
-influxdb-client-3
+influxdb-client
 pandas
 numpy
 cloudinary
