@@ -114,3 +114,40 @@ def eliminar_evento(
             status_code=404,
             detail=str(error)
         )
+
+from sqlalchemy import text
+from datetime import datetime
+
+@router.post("/reglas-fusion")
+def guardar_regla_fusion(
+    datos: Dict[str, Any],
+    db: Session = Depends(get_db)
+):
+    try:
+        condicion_iot = datos.get("condicion_iot")
+        clase_yolo = datos.get("clase_yolo")
+        operador = datos.get("operador", "AND")
+
+        query = text("""
+            INSERT INTO reglas_fusion (condicion_iot, clase_yolo, operador, estado, fecha_creacion)
+            VALUES (:condicion_iot, :clase_yolo, :operador, TRUE, :fecha_creacion)
+        """)
+        
+        db.execute(query, {
+            "condicion_iot": condicion_iot,
+            "clase_yolo": clase_yolo,
+            "operador": operador,
+            "fecha_creacion": datetime.now()
+        })
+        db.commit()
+
+        return {
+            "mensaje": "Regla de fusión guardada correctamente en Neon",
+            "estado": "EXITOSO"
+        }
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error al guardar la regla de fusión: {str(error)}"
+        )   
