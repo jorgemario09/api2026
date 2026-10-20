@@ -16,6 +16,10 @@ from app.api.rutas_whatsapp import router as whatsapp_router
 from app.api.rutas_influx import router as influx_router  # <--- 1. Importas el router de InfluxDB
 from app.api.rutas_yolo import router as yolo_router
 
+from fastapi import APIRouter
+from app.api.rutas_yolo import router as yolo_router
+from app.api.rutas_prediccion import router as prediccion_router
+
 router = APIRouter()
 
 router.routes.extend(ubicaciones_router.routes)
@@ -33,3 +37,6 @@ router.routes.extend(asistente_router.routes)
 router.routes.extend(whatsapp_router.routes)
 router.routes.extend(influx_router.routes)  # <--- 2. Extiendes las rutas del router de InfluxDB
 router.routes.extend(yolo_router.routes)
+
+router.routes.extend(yolo_router.routes)
+router.routes.extend(prediccion_router.routes)
