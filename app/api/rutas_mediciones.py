@@ -21,11 +21,15 @@ router = APIRouter(
 
 @router.get("/mediciones")
 def listar_mediciones(
+    limit: int = None,  # <--- Parámetro opcional para el ESP32
     db: Session = Depends(get_db)
 ):
     service = MedicionService(db)
-
     datos = service.listar_mediciones()
+
+    # Si se envía ?limit=20, recortamos la lista a los más recientes
+    if limit is not None and limit > 0:
+        datos = datos[:limit]
 
     return {
         "cantidad": len(datos),
