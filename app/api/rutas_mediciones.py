@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -21,15 +21,16 @@ router = APIRouter(
 
 @router.get("/mediciones")
 def listar_mediciones(
-    limit: int = None,  # <--- Parámetro opcional para el ESP32
+    limit: Optional[int] = None,   # Parámetro estándar en inglés
+    limite: Optional[int] = None,  # Parámetro alias para la app móvil/web
     db: Session = Depends(get_db)
 ):
-    service = MedicionService(db)
-    datos = service.listar_mediciones()
+    # Soporta tanto ?limit=20 como ?limite=20
+    max_registros = limit if limit is not None else limite
 
-    # Si se envía ?limit=20, recortamos la lista a los más recientes
-    if limit is not None and limit > 0:
-        datos = datos[:limit]
+    service = MedicionService(db)
+    # Delega la paginación a la base de datos de Neon a través del servicio
+    datos = service.listar_mediciones(limit=max_registros)
 
     return {
         "cantidad": len(datos),
