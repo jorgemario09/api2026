@@ -8,8 +8,8 @@ class MedicionService(BaseService):
     def __init__(self, db):
         self.repository = MedicionRepository(db)
 
-    def listar_mediciones(self):
-        return self.repository.obtener_mediciones()
+    def listar_mediciones(self, limit: int = None):
+        return self.repository.obtener_mediciones(limit=limit)
 
     def obtener_medicion(self, id_medicion):
         resultado = self.repository.obtener_medicion(id_medicion)
