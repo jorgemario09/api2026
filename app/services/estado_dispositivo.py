@@ -1,42 +1,40 @@
 from datetime import datetime
 from app.services.base_service import BaseService
-from app.repositories.medicion import MedicionRepository
+from app.repositories.estado_dispositivo import EstadoRepository
 
 
-class MedicionService(BaseService):
+class EstadoService(BaseService):
 
     def __init__(self, db):
-        self.repository = MedicionRepository(db)
+        self.repository = EstadoRepository(db)
 
-    def listar_mediciones(self, limit: int = None):
-        return self.repository.obtener_mediciones(limit=limit)
+    def listar_estados(self):
+        return self.repository.obtener_estados()
 
-    def obtener_medicion(self, id_medicion):
-        resultado = self.repository.obtener_medicion(id_medicion)
+    def obtener_estado(self, id_estado):
+        resultado = self.repository.obtener_estado(id_estado)
         if resultado is None:
-            raise ValueError("La medición no existe")
+            raise ValueError("El estado no existe")
         return resultado
 
-    def crear_medicion(self, datos):
+    def crear_estado(self, datos):
         self.validar_datos(datos)
-        if not datos.get("id_sensor"):
-            raise ValueError("Debe indicar el sensor")
-        if datos.get("valor") is None:
-            raise ValueError("El valor de la medición es obligatorio")
+        if not datos.get("id_dispositivo"):
+            raise ValueError("Debe indicar el dispositivo")
+        if not datos.get("estado"):
+            raise ValueError("Debe indicar el estado")
         if not datos.get("fecha_hora"):
             datos["fecha_hora"] = datetime.now()
-        if not datos.get("calidad_dato"):
-            datos["calidad_dato"] = "VALIDO"
-        return self.repository.crear_medicion(datos)
+        return self.repository.crear_estado(datos)
 
-    def actualizar_medicion(self, id_medicion, datos):
-        resultado = self.repository.actualizar_medicion(id_medicion, datos)
+    def actualizar_estado(self, id_estado, datos):
+        resultado = self.repository.actualizar_estado(id_estado, datos)
         if resultado is None:
-            raise ValueError("La medición no existe")
+            raise ValueError("El estado no existe")
         return resultado
 
-    def eliminar_medicion(self, id_medicion):
-        resultado = self.repository.eliminar_medicion(id_medicion)
+    def eliminar_estado(self, id_estado):
+        resultado = self.repository.eliminar_estado(id_estado)
         if resultado is None:
-            raise ValueError("La medición no existe")
+            raise ValueError("El estado no existe")
         return resultado
