@@ -5,9 +5,11 @@ from app.models.vw_medicion_optimizada import VwMedicionOptimizada
 
 class MedicionRepository(BaseRepository):
 
-    def obtener_mediciones(self):
-        # Mantiene la consulta a la vista optimizada[cite: 3]
-        return self.obtener_todos(VwMedicionOptimizada)
+    def obtener_mediciones(self, limit: int = None):
+        query = self.db.query(VwMedicionOptimizada).order_by(VwMedicionOptimizada.fecha_hora.desc())
+        if limit is not None and limit > 0:
+            return query.limit(limit).all()
+        return query.all()
 
     def obtener_medicion(self, id_medicion: int):
         return self.obtener_por_id(Medicion, "id_medicion", id_medicion)
