@@ -1,5 +1,3 @@
-from fastapi import APIRouter
-
 from app.api.rutas_ubicaciones import router as ubicaciones_router
 from app.api.rutas_dispositivos import router as dispositivos_router
 from app.api.rutas_tipos_sensor import router as tipos_sensor_router
