@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware  # <-- Importante para peticiones desde App Móvil / Web
 from app.api import router as api_router
 
 app = FastAPI(
@@ -11,7 +12,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Registrar los 11 routers correspondientes a las tablas de la base de datos
+# Configuración Middleware CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Permite peticiones desde cualquier origen (móvil, web local o Render)
+    allow_credentials=True,
+    allow_methods=["*"],  # Permite GET, POST, PUT, DELETE, etc.
+    allow_headers=["*"],
+)
+
+# Registrar routers (incluye mediciones, dispositivos y el nuevo de predicción ML)
 app.include_router(api_router)
 
 
