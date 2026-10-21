@@ -1,9 +1,12 @@
 from typing import Any, Dict, Optional
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.core.database import get_db
 from app.services.medicion import MedicionService
+from app.models.vw_medicion_optimizada import VwMedicionOptimizada
 from app.api.respuestas import convertir_a_dict, convertir_lista
 
 
@@ -14,36 +17,59 @@ router = APIRouter(
 
 
 # =========================================================
-# ENDPOINT RESUMIDO ULTRA-LIGERO PARA ESP32
+# ENDPOINTS OPTIMIZADOS PARA EL MENÚ DEL ESP32
 # =========================================================
-@router.get("/mediciones/resumen-esp32")
-def obtener_resumen_esp32(db: Session = Depends(get_db)):
-    """
-    Entrega un JSON pequeño con el cálculo de promedio, máximo, mínimo
-    y total de registros ejecutado directamente en Neon.
-    """
-    service = MedicionService(db)
-    mediciones = service.listar_mediciones(limit=50)
+
+@router.get("/mediciones/promedio-24h")
+def obtener_promedio_24h(db: Session = Depends(get_db)):
+    """Calcula en Neon el promedio de todas las mediciones de las últimas 24 horas."""
+    hace_24h = datetime.now() - timedelta(hours=24)
+    resultado = db.query(func.avg(VwMedicionOptimizada.medicion)).filter(
+        VwMedicionOptimizada.fecha_hora >= hace_24h
+    ).scalar()
     
-    if not mediciones:
-        return {"promedio": 0.0, "maximo": 0.0, "minimo": 0.0, "total": 0}
-        
-    valores = [float(m.medicion) for m in mediciones if m.medicion is not None]
+    promedio = round(float(resultado), 2) if resultado is not None else 0.0
+    return {"promedio_24h": promedio}
+
+
+@router.get("/mediciones/conteo-hoy")
+def obtener_conteo_dia_actual(db: Session = Depends(get_db)):
+    """Cuenta el número de registros ingresados desde la medianoche de hoy."""
+    inicio_dia = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    conteo = db.query(func.count(VwMedicionOptimizada.medicion)).filter(
+        VwMedicionOptimizada.fecha_hora >= inicio_dia
+    ).scalar()
     
-    if not valores:
-        return {"promedio": 0.0, "maximo": 0.0, "minimo": 0.0, "total": 0}
+    return {"registros_hoy": conteo or 0}
+
+
+@router.get("/mediciones/valores-elevados")
+def obtener_valores_elevados(db: Session = Depends(get_db)):
+    """Obtiene los valores máximos registrados tanto de temperatura como de turbidez."""
+    max_temp = db.query(func.max(VwMedicionOptimizada.medicion)).filter(
+        func.lower(VwMedicionOptimizada.tipo_medicion).like("%temp%")
+    ).scalar()
+
+    max_turb = db.query(func.max(VwMedicionOptimizada.medicion)).filter(
+        func.lower(VwMedicionOptimizada.tipo_medicion).like("%turb%")
+    ).scalar()
+
+    # Si no hay distinción por tipo, toma el máximo general de la vista
+    if max_temp is None and max_turb is None:
+        max_general = db.query(func.max(VwMedicionOptimizada.medicion)).scalar()
+        max_temp = max_general or 0.0
+        max_turb = max_general or 0.0
 
     return {
-        "promedio": round(sum(valores) / len(valores), 2),
-        "maximo": round(max(valores), 2),
-        "minimo": round(min(valores), 2),
-        "total": len(valores)
+        "max_temperatura": round(float(max_temp), 1) if max_temp is not None else 0.0,
+        "max_turbidez": round(float(max_turb), 1) if max_turb is not None else 0.0
     }
 
 
 # =========================================================
-# MEDICIONES CONVENCIONALES
+# MEDICIONES CONVENCIONALES CRUD
 # =========================================================
+
 @router.get("/mediciones")
 def listar_mediciones(
     limit: Optional[int] = None,
