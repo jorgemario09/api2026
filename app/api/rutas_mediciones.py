@@ -15,34 +15,6 @@ router = APIRouter(
     tags=["Mediciones"]
 )
 
-# =========================================================
-# VARIABLE GLOBAL PARA SINCRONIZACIÓN EN TIEMPO REAL CON LA APP
-# =========================================================
-ultimo_evento_esp32 = {
-    "opcion": 0,
-    "titulo": "Sistema listo",
-    "resultado": "Esperando seleccion en ESP32...",
-    "fecha_hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-}
-
-@router.post("/mediciones/notificar-teclado")
-def notificar_teclado_esp32(datos: Dict[str, Any]):
-    """Recibe la tecla/opción ejecutada en el ESP32 para actualizar la App Móvil."""
-    global ultimo_evento_esp32
-    ultimo_evento_esp32 = {
-        "opcion": datos.get("opcion"),
-        "titulo": datos.get("titulo"),
-        "resultado": datos.get("resultado"),
-        "fecha_hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    return {"estado": "OK", "mensaje": "Sincronizado con la App"}
-
-
-@router.get("/mediciones/ultimo-evento-teclado")
-def obtener_ultimo_evento_teclado():
-    """Consulta la App Móvil para reflejar el estado del LCD en pantalla."""
-    return ultimo_evento_esp32
-
 
 # =========================================================
 # ENDPOINTS OPTIMIZADOS PARA EL MENÚ DEL ESP32
@@ -50,7 +22,7 @@ def obtener_ultimo_evento_teclado():
 
 @router.get("/mediciones/promedio-24h")
 def obtener_promedio_24h(db: Session = Depends(get_db)):
-    """Calcula el promedio de las últimas 24 horas directamente en Neon."""
+    """Calcula en Neon el promedio de todas las mediciones de las últimas 24 horas."""
     hace_24h = datetime.now() - timedelta(hours=24)
     resultado = db.query(func.avg(VwMedicionOptimizada.medicion)).filter(
         VwMedicionOptimizada.fecha_hora >= hace_24h
@@ -62,7 +34,7 @@ def obtener_promedio_24h(db: Session = Depends(get_db)):
 
 @router.get("/mediciones/conteo-hoy")
 def obtener_conteo_dia_actual(db: Session = Depends(get_db)):
-    """Cuenta los registros guardados desde la medianoche."""
+    """Cuenta el número de registros ingresados desde la medianoche de hoy."""
     inicio_dia = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     conteo = db.query(func.count(VwMedicionOptimizada.medicion)).filter(
         VwMedicionOptimizada.fecha_hora >= inicio_dia
@@ -73,7 +45,7 @@ def obtener_conteo_dia_actual(db: Session = Depends(get_db)):
 
 @router.get("/mediciones/valores-elevados")
 def obtener_valores_elevados(db: Session = Depends(get_db)):
-    """Obtiene los valores máximos de temperatura y turbidez."""
+    """Obtiene los valores máximos registrados tanto de temperatura como de turbidez."""
     max_temp = db.query(func.max(VwMedicionOptimizada.medicion)).filter(
         func.lower(VwMedicionOptimizada.tipo_medicion).like("%temp%")
     ).scalar()
@@ -82,6 +54,7 @@ def obtener_valores_elevados(db: Session = Depends(get_db)):
         func.lower(VwMedicionOptimizada.tipo_medicion).like("%turb%")
     ).scalar()
 
+    # Si no hay distinción por tipo, toma el máximo general de la vista
     if max_temp is None and max_turb is None:
         max_general = db.query(func.max(VwMedicionOptimizada.medicion)).scalar()
         max_temp = max_general or 0.0
@@ -94,7 +67,7 @@ def obtener_valores_elevados(db: Session = Depends(get_db)):
 
 
 # =========================================================
-# MEDICIONES CONVENCIONALES (CRUD)
+# MEDICIONES CONVENCIONALES CRUD
 # =========================================================
 
 @router.get("/mediciones")
