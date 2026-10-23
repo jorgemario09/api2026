@@ -8,7 +8,7 @@ from app.core.database import get_db
 from app.services.medicion import MedicionService
 from app.models.vw_medicion_optimizada import VwMedicionOptimizada
 from app.api.respuestas import convertir_a_dict, convertir_lista
-
+from app.models.medicion import Medicion  # <--- IMPORTACIÓN AGREGADA PARA EL NUEVO ENDPOINT
 
 router = APIRouter(
     prefix="/agua",
@@ -42,6 +42,57 @@ def notificar_teclado_esp32(datos: Dict[str, Any]):
 def obtener_ultimo_evento_teclado():
     """Consulta la App Móvil para reflejar el estado del LCD en pantalla."""
     return ultimo_evento_esp32
+
+
+# =========================================================
+# NUEVO ENDPOINT PARA RECIBIR DATOS IOT (TELEGRAF / ESP32)
+# =========================================================
+@router.post("/mediciones/iot")
+def recibir_telemetria_iot(
+    datos: Dict[str, Any],
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint dedicado para recibir el payload JSON exacto de Telegraf/ESP32:
+    {"device": "esp32_01", "temp": 25.5, "hum": 10.0}
+    """
+    try:
+        temperatura = datos.get("temp")
+        turbidez = datos.get("hum")
+        
+        # Soporte por si Telegraf envía los datos anidados en "fields"
+        if temperatura is None and "fields" in datos:
+            temperatura = datos["fields"].get("temp")
+            turbidez = datos["fields"].get("hum")
+
+        if temperatura is None or turbidez is None:
+            raise ValueError("El JSON no contiene 'temp' ni 'hum'")
+
+        # Crear el registro para la Temperatura (Cambiar el id_sensor por el real de tu BD)
+        medicion_temp = Medicion(
+            id_sensor=1,  
+            valor=temperatura,
+            fecha_hora=datetime.now(),
+            calidad_dato="VALIDO"
+        )
+        
+        # Crear el registro para la Turbidez (Cambiar el id_sensor por el real de tu BD)
+        medicion_turb = Medicion(
+            id_sensor=2,  
+            valor=turbidez,
+            fecha_hora=datetime.now(),
+            calidad_dato="VALIDO"
+        )
+
+        db.add(medicion_temp)
+        db.add(medicion_turb)
+        db.commit()
+
+        return {"estado": "OK", "mensaje": "Telemetría IoT guardada en Neon"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # =========================================================
