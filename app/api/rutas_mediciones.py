@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request  # <--- IMPORTACIÓN DE 'Request' AÑADIDA
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -48,27 +48,37 @@ def obtener_ultimo_evento_teclado():
 # NUEVO ENDPOINT PARA RECIBIR DATOS IOT (TELEGRAF / ESP32)
 # =========================================================
 @router.post("/mediciones/iot")
-def recibir_telemetria_iot(
-    datos: Dict[str, Any],
+async def recibir_telemetria_iot(
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
-    Endpoint dedicado para recibir el payload JSON exacto de Telegraf/ESP32:
-    {"device": "esp32_01", "temp": 25.5, "hum": 10.0}
+    Endpoint dedicado para recibir el payload de Telegraf.
+    Soporta formato lista (array) o diccionario (objeto).
     """
     try:
+        # Extraemos el JSON crudo tal cual como lo manda Telegraf
+        payload = await request.json()
+        
+        # Identificar si es lista u objeto
+        datos = payload
+        if isinstance(payload, list):
+            datos = payload[0]
+        elif isinstance(payload, dict) and "metrics" in payload:
+            datos = payload["metrics"][0]
+
         temperatura = datos.get("temp")
         turbidez = datos.get("hum")
         
-        # Soporte por si Telegraf envía los datos anidados en "fields"
+        # Telegraf suele meter las variables dentro de "fields"
         if temperatura is None and "fields" in datos:
             temperatura = datos["fields"].get("temp")
             turbidez = datos["fields"].get("hum")
 
         if temperatura is None or turbidez is None:
-            raise ValueError("El JSON no contiene 'temp' ni 'hum'")
+            raise ValueError(f"Faltan datos. Payload recibido: {payload}")
 
-        # Crear el registro para la Temperatura (Cambiar el id_sensor por el real de tu BD)
+        # Guardar en BD (Asegúrate de que 1 y 2 sean los IDs correctos de tus sensores)
         medicion_temp = Medicion(
             id_sensor=1,  
             valor=temperatura,
@@ -76,7 +86,6 @@ def recibir_telemetria_iot(
             calidad_dato="VALIDO"
         )
         
-        # Crear el registro para la Turbidez (Cambiar el id_sensor por el real de tu BD)
         medicion_turb = Medicion(
             id_sensor=2,  
             valor=turbidez,
